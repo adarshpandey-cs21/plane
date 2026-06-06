@@ -44,6 +44,7 @@ import { TransferHopInfo } from "@/plane-web/components/issues/issue-details/sid
 import { IssueWorklogProperty } from "@/plane-web/components/issues/worklog/property";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
 import { IssueCycleSelect } from "./cycle-select";
+import { IssueDevelopmentSection } from "./development-section";
 import { IssueLabel } from "./label";
 import { IssueModuleSelect } from "./module-select";
 import type { TIssueOperations } from "./root";
@@ -274,6 +275,8 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
               isEditable={isEditable}
             />
           </div>
+
+          <IssueDevelopmentSection issueId={issueId} />
         </div>
       </div>
     </>

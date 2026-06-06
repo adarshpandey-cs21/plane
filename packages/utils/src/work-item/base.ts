@@ -336,6 +336,37 @@ export const generateWorkItemLink = ({
   return isArchived ? archiveIssueLink : isEpic ? epicLink : workItemLink;
 };
 
+export const generateGitBranchName = ({
+  projectIdentifier,
+  sequenceId,
+  title,
+  maxLength = 80,
+}: {
+  projectIdentifier: string | undefined | null;
+  sequenceId: number | string | undefined | null;
+  title: string | undefined | null;
+  maxLength?: number;
+}): string => {
+  const prefix = `${projectIdentifier ?? ""}-${sequenceId ?? ""}`;
+
+  if (!title) return prefix;
+
+  const sanitized = title
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  const branchName = `${prefix}-${sanitized}`;
+  if (branchName.length <= maxLength) return branchName;
+
+  const truncated = branchName.slice(0, maxLength);
+  const lastHyphen = truncated.lastIndexOf("-");
+  return lastHyphen > prefix.length ? truncated.slice(0, lastHyphen) : truncated;
+};
+
 export const getIssuePriorityFilters = (priorityKey: TIssuePriorities): TIssueFilterPriorityObject | undefined => {
   const currentIssuePriority: TIssueFilterPriorityObject | undefined =
     ISSUE_PRIORITY_FILTERS && ISSUE_PRIORITY_FILTERS.length > 0

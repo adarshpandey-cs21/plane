@@ -43,6 +43,7 @@ import { TransferHopInfo } from "@/plane-web/components/issues/issue-details/sid
 import { IssueWorklogProperty } from "@/plane-web/components/issues/worklog/property";
 import type { TIssueOperations } from "../issue-detail";
 import { IssueCycleSelect } from "../issue-detail/cycle-select";
+import { IssueDevelopmentSection } from "../issue-detail/development-section";
 import { IssueLabel } from "../issue-detail/label";
 import { IssueModuleSelect } from "../issue-detail/module-select";
 
@@ -269,6 +270,8 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           isPeekView
         />
       </div>
+
+      <IssueDevelopmentSection issueId={issueId} />
     </div>
   );
 });
