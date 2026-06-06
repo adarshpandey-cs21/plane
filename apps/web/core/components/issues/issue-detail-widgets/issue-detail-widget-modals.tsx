@@ -33,6 +33,7 @@ export const IssueDetailWidgetModals = observer(function IssueDetailWidgetModals
   const { workspaceSlug, projectId, issueId, issueServiceType, hideWidgets } = props;
   // store hooks
   const {
+    issue: { getIssueById },
     isIssueLinkModalOpen,
     toggleIssueLinkModal: toggleIssueLinkModalStore,
     setIssueLinkData,
@@ -131,9 +132,14 @@ export const IssueDetailWidgetModals = observer(function IssueDetailWidgetModals
   };
 
   // helpers
+  const parentIssueId = issueCrudOperationState?.create?.parentIssueId;
+  const parentIssue = parentIssueId ? getIssueById(parentIssueId) : undefined;
+
   const createUpdateModalData: Partial<TIssue> = {
-    parent_id: issueCrudOperationState?.create?.parentIssueId,
+    parent_id: parentIssueId,
     project_id: projectId,
+    cycle_id: parentIssue?.cycle_id ?? undefined,
+    module_ids: parentIssue?.module_ids ?? undefined,
   };
 
   const existingIssuesModalSearchParams = {

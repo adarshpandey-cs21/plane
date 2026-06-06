@@ -14,10 +14,14 @@ import { useQuickActionsFactory } from "@/plane-web/components/common/quick-acti
 interface UseCycleMenuItemsProps {
   cycleDetails: ICycle | undefined;
   isEditingAllowed: boolean;
+  isAdmin: boolean;
   workspaceSlug: string;
   projectId: string;
   cycleId: string;
   handleEdit: () => void;
+  handleMarkCompleted: () => void;
+  handleRevertCompletion: () => void;
+  handleStartCycle: () => void;
   handleArchive: () => void;
   handleRestore: () => void;
   handleDelete: () => void;
@@ -66,14 +70,23 @@ type MenuResult = {
 
 export const useCycleMenuItems = (props: UseCycleMenuItemsProps): MenuResult => {
   const factory = useQuickActionsFactory();
-  const { cycleDetails, isEditingAllowed, ...handlers } = props;
+  const { cycleDetails, isEditingAllowed, isAdmin, ...handlers } = props;
 
   const isArchived = !!cycleDetails?.archived_at;
   const isCompleted = cycleDetails?.status?.toLowerCase() === "completed";
+  const isManuallyCompleted = !!cycleDetails?.completed_at;
+  const isCurrent = cycleDetails?.status?.toLowerCase() === "current";
+  const isUpcoming = cycleDetails?.status?.toLowerCase() === "upcoming";
+  const canMarkCompleted = isEditingAllowed && isCurrent && !isCompleted && !isArchived;
+  const canRevertCompletion = isAdmin && isManuallyCompleted && !isArchived;
+  const canStartCycle = isEditingAllowed && isUpcoming && !isArchived;
 
   // Assemble final menu items - order defined here
   const items = [
     factory.createEditMenuItem(handlers.handleEdit, isEditingAllowed && !isCompleted && !isArchived),
+    factory.createStartCycleMenuItem(handlers.handleStartCycle, canStartCycle),
+    factory.createMarkCompletedMenuItem(handlers.handleMarkCompleted, canMarkCompleted),
+    factory.createRevertCompletionMenuItem(handlers.handleRevertCompletion, canRevertCompletion),
     factory.createOpenInNewTabMenuItem(handlers.handleOpenInNewTab),
     factory.createCopyLinkMenuItem(handlers.handleCopyLink),
     factory.createArchiveMenuItem(handlers.handleArchive, {

@@ -102,6 +102,7 @@ export interface ICycle extends TProgressSnapshot {
   sub_issues?: number;
   updated_at?: string;
   updated_by?: string;
+  completed_at: string | null;
   archived_at: string | null;
   assignee_ids?: string[];
   view_props: {

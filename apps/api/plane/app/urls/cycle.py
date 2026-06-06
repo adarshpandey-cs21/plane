@@ -9,6 +9,8 @@ from plane.app.views import (
     CycleViewSet,
     CycleIssueViewSet,
     CycleDateCheckEndpoint,
+    CycleCompleteEndpoint,
+    CycleStartEndpoint,
     CycleFavoriteViewSet,
     CycleProgressEndpoint,
     CycleAnalyticsEndpoint,
@@ -67,6 +69,16 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/user-favorite-cycles/<uuid:cycle_id>/",
         CycleFavoriteViewSet.as_view({"delete": "destroy"}),
         name="user-favorite-cycle",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/cycles/<uuid:cycle_id>/complete/",
+        CycleCompleteEndpoint.as_view(),
+        name="cycle-complete",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/cycles/<uuid:cycle_id>/start/",
+        CycleStartEndpoint.as_view(),
+        name="cycle-start",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/cycles/<uuid:cycle_id>/transfer-issues/",

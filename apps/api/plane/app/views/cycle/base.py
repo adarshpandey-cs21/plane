@@ -152,6 +152,10 @@ class CycleViewSet(BaseViewSet):
             .annotate(
                 status=Case(
                     When(
+                        completed_at__isnull=False,
+                        then=Value("COMPLETED"),
+                    ),
+                    When(
                         Q(start_date__lte=current_time_in_utc) & Q(end_date__gte=current_time_in_utc),
                         then=Value("CURRENT"),
                     ),
@@ -202,7 +206,11 @@ class CycleViewSet(BaseViewSet):
 
         # Current Cycle
         if cycle_view == "current":
-            queryset = queryset.filter(start_date__lte=current_time_in_utc, end_date__gte=current_time_in_utc)
+            queryset = queryset.filter(
+                start_date__lte=current_time_in_utc,
+                end_date__gte=current_time_in_utc,
+                completed_at__isnull=True,
+            )
 
             data = queryset.values(
                 # necessary fields
@@ -229,8 +237,9 @@ class CycleViewSet(BaseViewSet):
                 "status",
                 "version",
                 "created_by",
+                "completed_at",
             )
-            datetime_fields = ["start_date", "end_date"]
+            datetime_fields = ["start_date", "end_date", "completed_at"]
             data = user_timezone_converter(data, datetime_fields, project_timezone)
 
             if data:
@@ -262,8 +271,9 @@ class CycleViewSet(BaseViewSet):
             "status",
             "version",
             "created_by",
+            "completed_at",
         )
-        datetime_fields = ["start_date", "end_date"]
+        datetime_fields = ["start_date", "end_date", "completed_at"]
         data = user_timezone_converter(data, datetime_fields, project_timezone)
         return Response(data, status=status.HTTP_200_OK)
 
@@ -303,6 +313,7 @@ class CycleViewSet(BaseViewSet):
                         "assignee_ids",
                         "status",
                         "created_by",
+                        "completed_at",
                     )
                     .first()
                 )
@@ -311,7 +322,7 @@ class CycleViewSet(BaseViewSet):
                 project = Project.objects.get(id=self.kwargs.get("project_id"))
                 project_timezone = project.timezone
 
-                datetime_fields = ["start_date", "end_date"]
+                datetime_fields = ["start_date", "end_date", "completed_at"]
                 cycle = user_timezone_converter(cycle, datetime_fields, project_timezone)
 
                 # Send the model activity
@@ -346,9 +357,13 @@ class CycleViewSet(BaseViewSet):
 
         request_data = request.data
 
-        if cycle.end_date is not None and cycle.end_date < timezone.now():
+        # Check if cycle is already completed (either manually or by end_date)
+        is_completed = cycle.completed_at is not None or (
+            cycle.end_date is not None and cycle.end_date < timezone.now()
+        )
+        if is_completed:
             if "sort_order" in request_data:
-                # Can only change sort order for a completed cycle``
+                # Can only change sort order for a completed cycle
                 request_data = {"sort_order": request_data.get("sort_order", cycle.sort_order)}
             else:
                 return Response(
@@ -384,13 +399,14 @@ class CycleViewSet(BaseViewSet):
                 "assignee_ids",
                 "status",
                 "created_by",
+                "completed_at",
             ).first()
 
             # Fetch the project timezone
             project = Project.objects.get(id=self.kwargs.get("project_id"))
             project_timezone = project.timezone
 
-            datetime_fields = ["start_date", "end_date"]
+            datetime_fields = ["start_date", "end_date", "completed_at"]
             cycle = user_timezone_converter(cycle, datetime_fields, project_timezone)
 
             # Send the model activity
@@ -451,6 +467,7 @@ class CycleViewSet(BaseViewSet):
                 "assignee_ids",
                 "status",
                 "created_by",
+                "completed_at",
             )
             .first()
         )
@@ -462,7 +479,7 @@ class CycleViewSet(BaseViewSet):
         # Fetch the project timezone
         project = Project.objects.get(id=self.kwargs.get("project_id"))
         project_timezone = project.timezone
-        datetime_fields = ["start_date", "end_date"]
+        datetime_fields = ["start_date", "end_date", "completed_at"]
         data = user_timezone_converter(data, datetime_fields, project_timezone)
 
         recent_visited_task.delay(
@@ -522,38 +539,137 @@ class CycleDateCheckEndpoint(BaseAPIView):
     def post(self, request, slug, project_id):
         start_date = request.data.get("start_date", False)
         end_date = request.data.get("end_date", False)
-        cycle_id = request.data.get("cycle_id")
         if not start_date or not end_date:
             return Response(
                 {"error": "Start date and end date both are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        return Response({"status": True}, status=status.HTTP_200_OK)
 
-        start_date = convert_to_utc(date=str(start_date), project_id=project_id, is_start_date=True)
-        end_date = convert_to_utc(
-            date=str(end_date),
+
+class CycleCompleteEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def post(self, request, slug, project_id, cycle_id):
+        cycle = Cycle.objects.filter(
+            workspace__slug=slug,
             project_id=project_id,
-        )
+            pk=cycle_id,
+        ).first()
 
-        # Check if any cycle intersects in the given interval
-        cycles = Cycle.objects.filter(
-            Q(workspace__slug=slug)
-            & Q(project_id=project_id)
-            & (
-                Q(start_date__lte=start_date, end_date__gte=start_date)
-                | Q(start_date__lte=end_date, end_date__gte=end_date)
-                | Q(start_date__gte=start_date, end_date__lte=end_date)
-            )
-        ).exclude(pk=cycle_id)
-        if cycles.exists():
+        if not cycle:
             return Response(
-                {
-                    "error": "You have a cycle already on the given dates, if you want to create a draft cycle you can do that by removing dates",  # noqa: E501
-                    "status": False,
-                }
+                {"error": "Cycle not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        else:
-            return Response({"status": True}, status=status.HTTP_200_OK)
+
+        if cycle.completed_at:
+            return Response(
+                {"error": "Cycle is already completed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if cycle.end_date is not None and cycle.end_date < timezone.now():
+            return Response(
+                {"error": "Cycle is already completed by its end date"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Cycle must have dates and today must be within the cycle's date range
+        if cycle.start_date is None or cycle.end_date is None:
+            return Response(
+                {"error": "Cannot complete a draft cycle. Please set start and end dates first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if cycle.start_date > timezone.now():
+            return Response(
+                {"error": "Cannot complete a cycle that has not started yet."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cycle.completed_at = timezone.now()
+        cycle.save(update_fields=["completed_at"])
+
+        return Response({"message": "Cycle marked as completed"}, status=status.HTTP_200_OK)
+
+    @allow_permission([ROLE.ADMIN])
+    def delete(self, request, slug, project_id, cycle_id):
+        cycle = Cycle.objects.filter(
+            workspace__slug=slug,
+            project_id=project_id,
+            pk=cycle_id,
+        ).first()
+
+        if not cycle:
+            return Response(
+                {"error": "Cycle not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not cycle.completed_at:
+            return Response(
+                {"error": "Cycle is not manually completed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cycle.completed_at = None
+        cycle.save(update_fields=["completed_at"])
+
+        return Response({"message": "Cycle completion reverted"}, status=status.HTTP_200_OK)
+
+
+class CycleStartEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def post(self, request, slug, project_id, cycle_id):
+        cycle = Cycle.objects.filter(
+            workspace__slug=slug,
+            project_id=project_id,
+            pk=cycle_id,
+        ).first()
+
+        if not cycle:
+            return Response(
+                {"error": "Cycle not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if cycle.completed_at:
+            return Response(
+                {"error": "Cannot start a completed cycle"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Cycle must have an end_date
+        if cycle.end_date is None:
+            return Response(
+                {"error": "Cannot start a draft cycle without an end date. Please set dates first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+
+        # If cycle is already current, no-op
+        if cycle.start_date and cycle.start_date <= now and cycle.end_date >= now:
+            return Response(
+                {"error": "Cycle is already active"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # If end_date is already past, can't start
+        if cycle.end_date < now:
+            return Response(
+                {"error": "Cannot start a cycle whose end date has already passed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Set start_date to now
+        cycle.start_date = now
+        cycle.save(update_fields=["start_date"])
+
+        return Response(
+            {"message": "Cycle started", "start_date": str(cycle.start_date)},
+            status=status.HTTP_200_OK,
+        )
 
 
 class CycleFavoriteViewSet(BaseViewSet):

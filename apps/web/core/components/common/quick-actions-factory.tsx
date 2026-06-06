@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { Pencil, ExternalLink, Link, Trash2, ArchiveRestoreIcon } from "lucide-react";
+import { Pencil, ExternalLink, Link, Trash2, ArchiveRestoreIcon, CheckCircle2, Play, Undo2 } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { ArchiveIcon } from "@plane/propel/icons";
 import type { TContextMenuItem } from "@plane/ui";
@@ -37,6 +37,30 @@ export const useQuickActionsFactory = () => {
       title: t("copy_link"),
       icon: Link,
       action: handler,
+    }),
+
+    createMarkCompletedMenuItem: (handler: () => void, shouldRender: boolean = true): TContextMenuItem => ({
+      key: "mark-completed",
+      title: "Mark as completed",
+      icon: CheckCircle2,
+      action: handler,
+      shouldRender,
+    }),
+
+    createRevertCompletionMenuItem: (handler: () => void, shouldRender: boolean = true): TContextMenuItem => ({
+      key: "revert-completion",
+      title: "Revert completion",
+      icon: Undo2,
+      action: handler,
+      shouldRender,
+    }),
+
+    createStartCycleMenuItem: (handler: () => void, shouldRender: boolean = true): TContextMenuItem => ({
+      key: "start-cycle",
+      title: "Start cycle",
+      icon: Play,
+      action: handler,
+      shouldRender,
     }),
 
     createArchiveMenuItem: (

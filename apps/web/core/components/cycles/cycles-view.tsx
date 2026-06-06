@@ -25,14 +25,16 @@ export interface ICyclesView {
 export const CyclesView = observer(function CyclesView(props: ICyclesView) {
   const { workspaceSlug, projectId } = props;
   // store hooks
-  const { getFilteredCycleIds, getFilteredCompletedCycleIds, loader, currentProjectActiveCycleId } = useCycle();
+  const { getFilteredCycleIds, getFilteredCompletedCycleIds, loader, currentProjectActiveCycleIds } = useCycle();
   const { searchQuery } = useCycleFilter();
   const { t } = useTranslation();
   // derived values
   const filteredCycleIds = getFilteredCycleIds(projectId, false);
   const filteredCompletedCycleIds = getFilteredCompletedCycleIds(projectId);
+  const activeCycleIdSet = new Set(currentProjectActiveCycleIds ?? []);
+  const completedCycleIdSet = new Set(filteredCompletedCycleIds ?? []);
   const filteredUpcomingCycleIds = (filteredCycleIds ?? []).filter(
-    (cycleId) => cycleId !== currentProjectActiveCycleId
+    (cycleId) => !activeCycleIdSet.has(cycleId) && !completedCycleIdSet.has(cycleId)
   );
 
   if (loader || !filteredCycleIds) return <CycleModuleListLayoutLoader />;

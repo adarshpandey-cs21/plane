@@ -122,6 +122,26 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
               />
             </SidebarPropertyListItem>
 
+            <SidebarPropertyListItem icon={UserCirclePropertyIcon} label="QA Assignee">
+              <MemberDropdown
+                value={issue?.qa_assignee_id ?? null}
+                onChange={(val: string | null) =>
+                  issueOperations.update(workspaceSlug, projectId, issueId, { qa_assignee_id: val })
+                }
+                disabled={!isEditable}
+                projectId={projectId?.toString() ?? ""}
+                placeholder="Add QA assignee"
+                multiple={false}
+                buttonVariant="transparent-with-text"
+                className="group w-full grow"
+                buttonContainerClassName="w-full text-left h-7.5"
+                buttonClassName={`text-body-xs-regular ${issue?.qa_assignee_id ? "" : "text-placeholder"}`}
+                hideIcon={!issue.qa_assignee_id}
+                dropdownArrow
+                dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
+              />
+            </SidebarPropertyListItem>
+
             <SidebarPropertyListItem icon={PriorityPropertyIcon} label={t("common.priority")}>
               <PriorityDropdown
                 value={issue?.priority}

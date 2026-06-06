@@ -101,9 +101,9 @@ export class IssueStore implements IIssueStore {
     // store handlers from issue detail
     // parent
     if (issue && issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
-      this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue?.parent?.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
-      });
+      this.issueService
+        .retrieve(workspaceSlug, issue.parent.project_id, issue?.parent?.id)
+        .then((res) => this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]));
     }
     // assignees
     // labels
@@ -150,6 +150,7 @@ export class IssueStore implements IIssueStore {
       priority: issue?.priority,
       label_ids: issue?.label_ids,
       assignee_ids: issue?.assignee_ids,
+      qa_assignee_id: issue?.qa_assignee_id,
       estimate_point: issue?.estimate_point,
       sub_issues_count: issue?.sub_issues_count,
       attachment_count: issue?.attachment_count,
@@ -286,9 +287,9 @@ export class IssueStore implements IIssueStore {
 
     // handle parent issue if exists
     if (issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
-      this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue.parent.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
-      });
+      this.issueService
+        .retrieve(workspaceSlug, issue.parent.project_id, issue.parent.id)
+        .then((res) => this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]));
     }
 
     // add identifiers to map

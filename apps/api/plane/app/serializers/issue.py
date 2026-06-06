@@ -97,6 +97,12 @@ class IssueCreateSerializer(BaseSerializer):
         write_only=True,
         required=False,
     )
+    qa_assignee_id = serializers.PrimaryKeyRelatedField(
+        source="qa_assignee",
+        queryset=User.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     project_id = serializers.UUIDField(source="project.id", read_only=True)
     workspace_id = serializers.UUIDField(source="workspace.id", read_only=True)
 
@@ -791,6 +797,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "module_ids",
             "label_ids",
             "assignee_ids",
+            "qa_assignee_id",
             "sub_issues_count",
             "created_at",
             "updated_at",
@@ -855,6 +862,7 @@ class IssueListDetailSerializer(serializers.Serializer):
             "module_ids": self.get_module_ids(instance),
             "label_ids": self.get_label_ids(instance),
             "assignee_ids": self.get_assignee_ids(instance),
+            "qa_assignee_id": instance.qa_assignee_id,
             "sub_issues_count": instance.sub_issues_count,
             "attachment_count": instance.attachment_count,
             "link_count": instance.link_count,

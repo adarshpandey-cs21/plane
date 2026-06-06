@@ -208,6 +208,10 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
             .annotate(
                 status=Case(
                     When(
+                        completed_at__isnull=False,
+                        then=Value("COMPLETED"),
+                    ),
+                    When(
                         Q(start_date__lte=timezone.now()) & Q(end_date__gte=timezone.now()),
                         then=Value("CURRENT"),
                     ),
@@ -299,6 +303,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
                     "assignee_ids",
                     "status",
                     "archived_at",
+                    "completed_at",
                 )
             ).order_by("-is_favorite", "-created_at")
             return Response(queryset, status=status.HTTP_200_OK)
@@ -350,6 +355,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
                     "status",
                     "created_by",
                     "archived_at",
+                    "completed_at",
                 )
                 .first()
             )
@@ -587,7 +593,10 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
     def post(self, request, slug, project_id, cycle_id):
         cycle = Cycle.objects.get(pk=cycle_id, project_id=project_id, workspace__slug=slug)
 
-        if cycle.end_date >= timezone.now():
+        is_completed = cycle.completed_at is not None or (
+            cycle.end_date and cycle.end_date < timezone.now()
+        )
+        if not is_completed:
             return Response(
                 {"error": "Only completed cycles can be archived"},
                 status=status.HTTP_400_BAD_REQUEST,
