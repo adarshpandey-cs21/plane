@@ -87,13 +87,19 @@ export const SubIssuesCollapsibleContent = observer(function SubIssuesCollapsibl
     const currentSubIssueHelpers = subIssueHelpersByIssueId(`${parentIssueId}_root`);
     if (!currentSubIssueHelpers.issue_visibility.includes(parentIssueId)) {
       try {
-        setSubIssueHelpers(`${parentIssueId}_root`, "preview_loader", parentIssueId);
+        if (!subIssueHelpersByIssueId(`${parentIssueId}_root`).preview_loader.includes(parentIssueId)) {
+          setSubIssueHelpers(`${parentIssueId}_root`, "preview_loader", parentIssueId);
+        }
         await subIssueOperations.fetchSubIssues(workspaceSlug, projectId, parentIssueId);
-        setSubIssueHelpers(`${parentIssueId}_root`, "issue_visibility", parentIssueId);
+        if (!subIssueHelpersByIssueId(`${parentIssueId}_root`).issue_visibility.includes(parentIssueId)) {
+          setSubIssueHelpers(`${parentIssueId}_root`, "issue_visibility", parentIssueId);
+        }
       } catch (error) {
         console.error("Error fetching sub-work items:", error);
       } finally {
-        setSubIssueHelpers(`${parentIssueId}_root`, "preview_loader", "");
+        if (subIssueHelpersByIssueId(`${parentIssueId}_root`).preview_loader.includes(parentIssueId)) {
+          setSubIssueHelpers(`${parentIssueId}_root`, "preview_loader", parentIssueId);
+        }
       }
     }
   }, [parentIssueId, projectId, setSubIssueHelpers, subIssueHelpersByIssueId, subIssueOperations, workspaceSlug]);

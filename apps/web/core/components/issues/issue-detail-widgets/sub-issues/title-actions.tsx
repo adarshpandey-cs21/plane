@@ -12,6 +12,7 @@ import {
   ISSUE_DISPLAY_FILTERS_BY_PAGE,
   SUB_WORK_ITEM_AVAILABLE_FILTERS_FOR_WORK_ITEM_PAGE,
 } from "@plane/constants";
+import { Checkbox } from "@plane/ui";
 import type {
   IIssueDisplayFilterOptions,
   IIssueDisplayProperties,
@@ -39,7 +40,7 @@ export const SubWorkItemTitleActions = observer(function SubWorkItemTitleActions
   // store hooks
   const {
     subIssues: {
-      filters: { getSubIssueFilters, updateSubWorkItemFilters },
+      filters: { getSubIssueFilters, updateSubWorkItemFilters, toggleHideCompleted },
     },
   } = useIssueDetail(issueServiceType);
   const { getProjectStates } = useProjectState();
@@ -89,12 +90,29 @@ export const SubWorkItemTitleActions = observer(function SubWorkItemTitleActions
   return (
     // prevent click everywhere
     <div
+      role="toolbar"
       className="flex items-center gap-2"
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
       }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+      }}
     >
+      <label
+        htmlFor={`hide-done-${parentId}`}
+        className="flex cursor-pointer items-center gap-1.5 text-13 whitespace-nowrap text-tertiary select-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Checkbox
+          id={`hide-done-${parentId}`}
+          checked={subIssueFilters?.hide_completed ?? false}
+          onChange={() => toggleHideCompleted(parentId)}
+          className="size-3.5"
+        />
+        Hide done
+      </label>
       <SubIssueDisplayFilters
         isEpic={issueServiceType === EIssueServiceType.EPICS}
         layoutDisplayFiltersOptions={layoutDisplayFiltersOptions}

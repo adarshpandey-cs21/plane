@@ -193,6 +193,7 @@ export type TSupportedFilterForUpdate = IIssueDisplayFilterOptions | IIssueDispl
 
 export interface ISubWorkItemFilters extends Omit<IIssueFilters, "richFilters"> {
   filters: IIssueFilterOptions;
+  hide_completed: boolean;
 }
 
 export interface IIssueFiltersResponse {

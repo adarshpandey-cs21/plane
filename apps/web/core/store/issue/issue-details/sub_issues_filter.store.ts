@@ -37,6 +37,7 @@ export interface IWorkItemSubIssueFiltersStore {
     filters: IIssueDisplayFilterOptions | IIssueDisplayProperties | IIssueFilterOptions,
     workItemId: string
   ) => void;
+  toggleHideCompleted: (workItemId: string) => void;
   getGroupedSubWorkItems: (workItemId: string) => TGroupedIssues;
   getFilteredSubWorkItems: (workItemId: string, filters: IIssueFilterOptions) => TIssue[];
   getSubIssueFilters: (workItemId: string) => Partial<ISubWorkItemFilters>;
@@ -54,6 +55,7 @@ export class WorkItemSubIssueFiltersStore implements IWorkItemSubIssueFiltersSto
     makeObservable(this, {
       subIssueFilters: observable,
       updateSubWorkItemFilters: action,
+      toggleHideCompleted: action,
       getSubIssueFilters: action,
     });
 
@@ -81,6 +83,7 @@ export class WorkItemSubIssueFiltersStore implements IWorkItemSubIssueFiltersSto
     set(this.subIssueFilters, [workItemId, "displayProperties"], DEFAULT_DISPLAY_PROPERTIES);
     set(this.subIssueFilters, [workItemId, "filters"], {});
     set(this.subIssueFilters, [workItemId, "displayFilters"], {});
+    set(this.subIssueFilters, [workItemId, "hide_completed"], false);
   };
 
   /**
@@ -95,6 +98,17 @@ export class WorkItemSubIssueFiltersStore implements IWorkItemSubIssueFiltersSto
   ) => {
     runInAction(() => {
       updateSubWorkItemFilters(this.subIssueFilters, filterType, filters, workItemId);
+    });
+  };
+
+  /**
+   * @description Toggles the hide_completed flag for a work item's sub-issues
+   * @param workItemId
+   */
+  toggleHideCompleted = (workItemId: string) => {
+    runInAction(() => {
+      const current = this.subIssueFilters[workItemId]?.hide_completed ?? false;
+      set(this.subIssueFilters, [workItemId, "hide_completed"], !current);
     });
   };
 
@@ -129,7 +143,15 @@ export class WorkItemSubIssueFiltersStore implements IWorkItemSubIssueFiltersSto
       "un-archived"
     );
 
-    const filteredWorkItems = getFilteredWorkItems(workItems, filters);
+    let filteredWorkItems = getFilteredWorkItems(workItems, filters);
+    const hideCompleted = this.subIssueFilters[workItemId]?.hide_completed ?? false;
+    if (hideCompleted) {
+      const stateStore = this.subIssueStore.rootIssueDetailStore.rootIssueStore.rootStore.state;
+      filteredWorkItems = filteredWorkItems.filter((item) => {
+        const stateDetails = stateStore.getStateById(item.state_id);
+        return stateDetails?.group !== "completed" && stateDetails?.group !== "cancelled";
+      });
+    }
 
     return filteredWorkItems;
   });
