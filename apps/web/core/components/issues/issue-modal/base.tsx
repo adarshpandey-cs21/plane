@@ -28,6 +28,8 @@ import { FileService } from "@/services/file.service";
 const fileService = new FileService();
 // local imports
 import { CreateIssueToastActionItems } from "../create-issue-toast-action-items";
+import { cloneWorkItemData } from "./copy-sub-work-items";
+import type { TCloneOptions } from "./copy-sub-work-items";
 import { DraftIssueLayout } from "./draft-issue-layout";
 import { IssueFormRoot } from "./form";
 import type { IssueFormProps } from "./form";
@@ -66,6 +68,11 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   const [description, setDescription] = useState<string | undefined>(undefined);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [cloneOptions, setCloneOptions] = useState<TCloneOptions>({
+    subWorkItems: false,
+    links: false,
+    relations: false,
+  });
   // store hooks
   const { t } = useTranslation();
   const { workspaceSlug, projectId: routerProjectId, cycleId, moduleId, workItem } = useParams();
@@ -74,7 +81,10 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   const { issues } = useIssues(storeType);
   const { issues: projectIssues } = useIssues(EIssuesStoreType.PROJECT);
   const { issues: draftIssues } = useIssues(EIssuesStoreType.WORKSPACE_DRAFT);
-  const { fetchIssue } = useIssueDetail();
+  const {
+    fetchIssue,
+    issue: { getIssueById },
+  } = useIssueDetail();
   const { allowedProjectIds, handleCreateUpdatePropertyValues, handleCreateSubWorkItem } = useIssueModal();
   const { getProjectByIdentifier } = useProject();
   // current store details
@@ -83,6 +93,11 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   const routerProjectIdentifier = workItem?.toString().split("-")[0];
   const projectIdFromRouter = getProjectByIdentifier(routerProjectIdentifier)?.id;
   const projectId = data?.project_id ?? routerProjectId?.toString() ?? projectIdFromRouter;
+  const sourceIssue = data?.sourceIssueId ? getIssueById(data.sourceIssueId) : undefined;
+  const sourceIssueCounts = {
+    subWorkItems: sourceIssue?.sub_issues_count ?? 0,
+    links: sourceIssue?.link_count ?? 0,
+  };
 
   const fetchIssueDetail = async (issueId: string | undefined) => {
     setDescription(undefined);
@@ -124,20 +139,20 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.project_id, data?.id, data?.sourceIssueId, projectId, isOpen, activeProjectId]);
 
-  const addIssueToCycle = async (issue: TIssue, cycleId: string) => {
+  const addIssueToCycle = async (issue: TIssue, targetCycleId: string) => {
     if (!workspaceSlug || !issue.project_id) return;
 
-    await issues.addIssueToCycle(workspaceSlug.toString(), issue.project_id, cycleId, [issue.id]);
-    fetchCycleDetails(workspaceSlug.toString(), issue.project_id, cycleId);
+    await issues.addIssueToCycle(workspaceSlug.toString(), issue.project_id, targetCycleId, [issue.id]);
+    fetchCycleDetails(workspaceSlug.toString(), issue.project_id, targetCycleId);
   };
 
-  const addIssueToModule = async (issue: TIssue, moduleIds: string[]) => {
+  const addIssueToModule = async (issue: TIssue, targetModuleIds: string[]) => {
     if (!workspaceSlug || !issue.project_id) return;
 
     await Promise.all([
-      issues.changeModulesInIssue(workspaceSlug.toString(), issue.project_id, issue.id, moduleIds, []),
-      ...moduleIds.map(
-        (moduleId) => issue.project_id && fetchModuleDetails(workspaceSlug.toString(), issue.project_id, moduleId)
+      issues.changeModulesInIssue(workspaceSlug.toString(), issue.project_id, issue.id, targetModuleIds, []),
+      ...targetModuleIds.map(
+        (modId) => issue.project_id && fetchModuleDetails(workspaceSlug.toString(), issue.project_id, modId)
       ),
     ]);
   };
@@ -153,6 +168,7 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
 
     setActiveProjectId(null);
     setChangesMade(null);
+    setCloneOptions({ subWorkItems: false, links: false, relations: false });
     onClose();
     handleDuplicateIssueModal(false);
   };
@@ -260,20 +276,20 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     }
   };
 
-  const handleCycleChange = async (data: Partial<TIssue> | undefined, payload: Partial<TIssue>) => {
-    if (!workspaceSlug || !data?.project_id || !data?.id) return;
+  const handleCycleChange = async (issueData: Partial<TIssue> | undefined, payload: Partial<TIssue>) => {
+    if (!workspaceSlug || !issueData?.project_id || !issueData?.id) return;
     // return if user is not trying to change the cycle, i.e
     // - cycle_id is not present in payload
     // - cycle_id is the same as the current cycle id
-    if (!("cycle_id" in payload) || isEqual(data?.cycle_id, payload.cycle_id)) return;
+    if (!("cycle_id" in payload) || isEqual(issueData?.cycle_id, payload.cycle_id)) return;
 
     const slug = workspaceSlug.toString();
 
     // Removing the cycle
-    const currentCycleId = data?.cycle_id;
+    const currentCycleId = issueData?.cycle_id;
     if (currentCycleId && payload.cycle_id === null) {
-      await issues.removeIssueFromCycle(slug, data.project_id, currentCycleId, data.id);
-      fetchCycleDetails(slug, data.project_id, currentCycleId).catch((error) => {
+      await issues.removeIssueFromCycle(slug, issueData.project_id, currentCycleId, issueData.id);
+      fetchCycleDetails(slug, issueData.project_id, currentCycleId).catch((error) => {
         console.error(error);
       });
     }
@@ -281,12 +297,12 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // Adding the cycle
     const newCycleId = payload.cycle_id;
     if (newCycleId && newCycleId !== "" && (payload.cycle_id !== cycleId || storeType !== EIssuesStoreType.CYCLE)) {
-      await addIssueToCycle(data as TBaseIssue, newCycleId);
+      await addIssueToCycle(issueData as TBaseIssue, newCycleId);
     }
   };
 
-  const handleModuleChange = async (data: Partial<TIssue>, payload: Partial<TIssue>) => {
-    if (!workspaceSlug || !data?.project_id || !data?.id) return;
+  const handleModuleChange = async (issueData: Partial<TIssue>, payload: Partial<TIssue>) => {
+    if (!workspaceSlug || !issueData?.project_id || !issueData?.id) return;
     // return if user is not trying to change the module, i.e
     // - module_ids is not present in payload
     // - module_ids is not an array
@@ -294,27 +310,27 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     if (
       !("module_ids" in payload) ||
       !Array.isArray(payload.module_ids) ||
-      isEqual(data?.module_ids, payload.module_ids)
+      isEqual(issueData?.module_ids, payload.module_ids)
     )
       return;
 
-    const updatedModuleIds = xor(data.module_ids, payload.module_ids);
+    const updatedModuleIds = xor(issueData.module_ids, payload.module_ids);
     const modulesToAdd: string[] = [];
     const modulesToRemove: string[] = [];
 
-    for (const moduleId of updatedModuleIds) {
-      if (data.module_ids?.includes(moduleId)) {
-        modulesToRemove.push(moduleId);
+    for (const modId of updatedModuleIds) {
+      if (issueData.module_ids?.includes(modId)) {
+        modulesToRemove.push(modId);
       } else {
-        modulesToAdd.push(moduleId);
+        modulesToAdd.push(modId);
       }
     }
     // update modules if there are modules to add or remove
     if (modulesToAdd.length > 0 || modulesToRemove.length > 0) {
       await issues.changeModulesInIssue(
         workspaceSlug.toString(),
-        data.project_id,
-        data.id,
+        issueData.project_id,
+        issueData.id,
         modulesToAdd,
         modulesToRemove
       );
@@ -366,7 +382,9 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
 
   const handleFormSubmit = async (payload: Partial<TIssue>, is_draft_issue: boolean = false) => {
     if (!workspaceSlug || !payload.project_id || !storeType) return;
-    // remove sourceIssueId from payload since it is not needed
+    // capture source issue info before removing it from payload
+    const sourceIssueId = data?.sourceIssueId;
+    const sourceProjectId = sourceIssue?.project_id ?? payload.project_id;
     if (data?.sourceIssueId) delete data.sourceIssueId;
 
     let response: TIssue | undefined = undefined;
@@ -377,6 +395,33 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
       else response = await handleUpdateIssue(payload);
     } finally {
       if (response != undefined && onSubmit) await onSubmit(response);
+    }
+
+    // Clone associated data (sub-work-items, links, relations) if any option is selected
+    const hasCloneOptions = cloneOptions.subWorkItems || cloneOptions.links || cloneOptions.relations;
+    if (hasCloneOptions && sourceIssueId && sourceProjectId && response?.id && workspaceSlug) {
+      try {
+        const result = await cloneWorkItemData(
+          workspaceSlug.toString(),
+          sourceIssueId,
+          response.id,
+          sourceProjectId,
+          cloneOptions
+        );
+        if (result.failedCount > 0) {
+          setToast({
+            type: TOAST_TYPE.WARNING,
+            title: t("warning"),
+            message: `${result.successCount} items copied, ${result.failedCount} failed.`,
+          });
+        }
+      } catch {
+        setToast({
+          type: TOAST_TYPE.WARNING,
+          title: t("warning"),
+          message: t("clone_data_copy_failed"),
+        });
+      }
     }
   };
 
@@ -410,6 +455,11 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     isDuplicateModalOpen: isDuplicateModalOpen,
     handleDuplicateIssueModal: handleDuplicateIssueModal,
     isProjectSelectionDisabled: isProjectSelectionDisabled,
+    cloneOptions: data?.sourceIssueId ? cloneOptions : undefined,
+    onCloneOptionChange: data?.sourceIssueId
+      ? (key: keyof TCloneOptions, value: boolean) => setCloneOptions((prev) => ({ ...prev, [key]: value }))
+      : undefined,
+    sourceIssueCounts: data?.sourceIssueId ? sourceIssueCounts : undefined,
   };
 
   return (

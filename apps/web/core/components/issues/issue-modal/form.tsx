@@ -17,7 +17,8 @@ import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TIssue, TWorkspaceDraftIssue } from "@plane/types";
 // hooks
-import { ToggleSwitch } from "@plane/ui";
+import { Checkbox, ToggleSwitch } from "@plane/ui";
+import type { TCloneOptions } from "./copy-sub-work-items";
 import {
   convertWorkItemDataToSearchResponse,
   getUpdateFormDataForReset,
@@ -73,6 +74,9 @@ export interface IssueFormProps {
   isProjectSelectionDisabled?: boolean;
   showActionButtons?: boolean;
   dataResetProperties?: any[];
+  cloneOptions?: TCloneOptions;
+  onCloneOptionChange?: (key: keyof TCloneOptions, value: boolean) => void;
+  sourceIssueCounts?: { subWorkItems: number; links: number };
 }
 
 export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormProps) {
@@ -100,6 +104,9 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     isProjectSelectionDisabled = false,
     showActionButtons = true,
     dataResetProperties = [],
+    cloneOptions,
+    onCloneOptionChange,
+    sourceIssueCounts,
   } = props;
 
   // states
@@ -270,6 +277,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
           });
           editorRef?.current?.clearEditor();
         }
+        return undefined;
       })
       .catch((error) => {
         console.error(error);
@@ -334,15 +342,16 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     const issue = getIssueById(parentId);
     if (!issue) return;
 
-    const projectDetails = getProjectById(issue.project_id);
-    if (!projectDetails) return;
+    const parentProjectDetails = getProjectById(issue.project_id);
+    if (!parentProjectDetails) return;
 
     const stateDetails = getStateById(issue.state_id);
 
     setSelectedParentIssue(
-      convertWorkItemDataToSearchResponse(workspaceSlug?.toString(), issue, projectDetails, stateDetails)
+      convertWorkItemDataToSearchResponse(workspaceSlug?.toString(), issue, parentProjectDetails, stateDetails)
     );
-  }, [watch, getIssueById, getProjectById, selectedParentIssue, getStateById]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watch, getIssueById, getProjectById, selectedParentIssue, getStateById, setSelectedParentIssue, workspaceSlug]);
 
   // executing this useEffect when isDirty changes
   useEffect(() => {
@@ -380,7 +389,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
         <div className="w-full rounded-lg">
           <form
             ref={formRef}
-            onSubmit={handleSubmit((data) => handleFormSubmit(data))}
+            onSubmit={handleSubmit((formData) => handleFormSubmit(formData))}
             className="flex w-full flex-col"
           >
             <div className="rounded-t-lg bg-surface-1 p-5">
@@ -507,23 +516,53 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                   setSelectedParentIssue={setSelectedParentIssue}
                 />
               </div>
+              {data?.sourceIssueId && cloneOptions && onCloneOptionChange && (
+                <div className="space-y-1.5 px-4 pt-2 pb-3">
+                  <p className="text-caption-sm-medium text-tertiary">{t("copy_options")}</p>
+                  {(sourceIssueCounts?.subWorkItems ?? 0) > 0 && (
+                    <label className="inline-flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={cloneOptions.subWorkItems}
+                        onChange={() => onCloneOptionChange("subWorkItems", !cloneOptions.subWorkItems)}
+                      />
+                      <span className="text-caption-sm-regular text-secondary select-none">
+                        {t("include_sub_work_items")} ({sourceIssueCounts?.subWorkItems})
+                      </span>
+                    </label>
+                  )}
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox
+                      checked={cloneOptions.links}
+                      onChange={() => onCloneOptionChange("links", !cloneOptions.links)}
+                    />
+                    <span className="text-caption-sm-regular text-secondary select-none">
+                      {t("include_links")}
+                      {(sourceIssueCounts?.links ?? 0) > 0 && ` (${sourceIssueCounts?.links})`}
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox
+                      checked={cloneOptions.relations}
+                      onChange={() => onCloneOptionChange("relations", !cloneOptions.relations)}
+                    />
+                    <span className="text-caption-sm-regular text-secondary select-none">{t("include_relations")}</span>
+                  </label>
+                </div>
+              )}
               {showActionButtons && (
                 <div
                   className="flex items-center justify-end gap-4 border-t-[0.5px] border-subtle pt-6 pb-3"
                   tabIndex={getIndex("create_more")}
                 >
                   {!data?.id && (
-                    <div
+                    <button
+                      type="button"
                       className="inline-flex cursor-pointer items-center gap-1.5"
                       onClick={() => onCreateMoreToggleChange(!isCreateMoreToggleEnabled)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") onCreateMoreToggleChange(!isCreateMoreToggleEnabled);
-                      }}
-                      role="button"
                     >
                       <ToggleSwitch value={isCreateMoreToggleEnabled} onChange={() => {}} size="sm" />
                       <span className="text-caption-sm-regular">{t("create_more")}</span>
-                    </div>
+                    </button>
                   )}
                   <div className="flex items-center gap-2">
                     <div tabIndex={getIndex("discard_button")}>

@@ -141,6 +141,7 @@ class SubIssuesEndpoint(BaseAPIView):
             sub_issues.values(
                 "id",
                 "name",
+                "description_html",
                 "state_id",
                 "sort_order",
                 "completed_at",
@@ -165,6 +166,7 @@ class SubIssuesEndpoint(BaseAPIView):
                 "is_draft",
                 "archived_at",
                 "state_group",
+                "type_id",
             )
         )
 
