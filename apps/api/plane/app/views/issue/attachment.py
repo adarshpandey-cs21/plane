@@ -92,6 +92,10 @@ class IssueAttachmentEndpoint(BaseAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+PREVIEWABLE_MIME_PREFIXES = ("image/", "video/", "audio/")
+PREVIEWABLE_MIME_TYPES = ("application/pdf",)
+
+
 class IssueAttachmentV2Endpoint(BaseAPIView):
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
@@ -181,9 +185,18 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
                 )
 
             storage = S3Storage(request=request)
+
+            # Serve previewable files inline unless download is explicitly requested
+            mime_type = asset.attributes.get("type", "")
+            is_previewable = any(
+                mime_type.startswith(prefix) for prefix in PREVIEWABLE_MIME_PREFIXES
+            ) or mime_type in PREVIEWABLE_MIME_TYPES
+            force_download = request.GET.get("download", "").lower() == "true"
+            disposition = "attachment" if force_download or not is_previewable else "inline"
+
             presigned_url = storage.generate_presigned_url(
                 object_name=asset.asset.name,
-                disposition="attachment",
+                disposition=disposition,
                 filename=asset.attributes.get("name"),
             )
             return HttpResponseRedirect(presigned_url)

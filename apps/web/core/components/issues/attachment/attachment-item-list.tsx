@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import type { FileRejection } from "react-dropzone";
 import { useDropzone } from "react-dropzone";
@@ -13,6 +13,7 @@ import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TIssueServiceType } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
+import { getFileExtension, getFileName, getFileURL } from "@plane/utils";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // plane web hooks
@@ -22,6 +23,7 @@ import type { TAttachmentHelpers } from "../issue-detail-widgets/attachments/hel
 // components
 import { IssueAttachmentsListItem } from "./attachment-list-item";
 import { IssueAttachmentsUploadItem } from "./attachment-list-upload-item";
+import { AttachmentPreview, isPreviewableFile } from "./attachment-preview";
 // types
 import { IssueAttachmentDeleteModal } from "./delete-attachment-modal";
 
@@ -46,9 +48,10 @@ export const IssueAttachmentItemList = observer(function IssueAttachmentItemList
   const { t } = useTranslation();
   // states
   const [isUploading, setIsUploading] = useState(false);
+  const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
   // store hooks
   const {
-    attachment: { getAttachmentsByIssueId },
+    attachment: { getAttachmentsByIssueId, getAttachmentById },
     attachmentDeleteModalId,
     toggleDeleteAttachmentModal,
     fetchActivities,
@@ -60,6 +63,31 @@ export const IssueAttachmentItemList = observer(function IssueAttachmentItemList
   const { maxFileSize } = useFileSize();
   // derived values
   const issueAttachments = getAttachmentsByIssueId(issueId);
+
+  // Compute list of previewable attachment IDs for navigation
+  const previewableIds = useMemo(() => {
+    if (!issueAttachments) return [];
+    return issueAttachments.filter((id) => {
+      const att = getAttachmentById(id);
+      if (!att) return false;
+      const ext = getFileExtension(att.attributes.name ?? "");
+      return isPreviewableFile(ext);
+    });
+  }, [issueAttachments, getAttachmentById]);
+
+  const previewIndex = previewAttachmentId ? previewableIds.indexOf(previewAttachmentId) : -1;
+  const previewAttachment = previewAttachmentId ? getAttachmentById(previewAttachmentId) : undefined;
+  const previewFileName = getFileName(previewAttachment?.attributes.name ?? "");
+  const previewFileExtension = getFileExtension(previewAttachment?.attributes.name ?? "");
+  const previewFileURL = getFileURL(previewAttachment?.asset_url ?? "");
+
+  const handlePrev = useCallback(() => {
+    if (previewIndex > 0) setPreviewAttachmentId(previewableIds[previewIndex - 1]);
+  }, [previewIndex, previewableIds]);
+
+  const handleNext = useCallback(() => {
+    if (previewIndex < previewableIds.length - 1) setPreviewAttachmentId(previewableIds[previewIndex + 1]);
+  }, [previewIndex, previewableIds]);
 
   // handlers
   const handleFetchPropertyActivities = useCallback(() => {
@@ -100,7 +128,7 @@ export const IssueAttachmentItemList = observer(function IssueAttachmentItemList
       });
       return;
     },
-    [createAttachment, maxFileSize, workspaceSlug, handleFetchPropertyActivities]
+    [createAttachment, maxFileSize, workspaceSlug, handleFetchPropertyActivities, t]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -112,8 +140,24 @@ export const IssueAttachmentItemList = observer(function IssueAttachmentItemList
 
   return (
     <>
-      {uploadStatus?.map((uploadStatus) => (
-        <IssueAttachmentsUploadItem key={uploadStatus.id} uploadStatus={uploadStatus} />
+      {/* Lightbox — rendered outside the dropzone to avoid event conflicts */}
+      {previewAttachmentId && previewFileURL && (
+        <AttachmentPreview
+          isOpen={Boolean(previewAttachmentId)}
+          onClose={() => setPreviewAttachmentId(null)}
+          fileURL={previewFileURL}
+          fileName={previewFileName}
+          fileExtension={previewFileExtension}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          hasPrev={previewIndex > 0}
+          hasNext={previewIndex < previewableIds.length - 1}
+          currentIndex={previewIndex}
+          totalCount={previewableIds.length}
+        />
+      )}
+      {uploadStatus?.map((status) => (
+        <IssueAttachmentsUploadItem key={status.id} uploadStatus={status} />
       ))}
       {issueAttachments && (
         <>
@@ -147,6 +191,7 @@ export const IssueAttachmentItemList = observer(function IssueAttachmentItemList
                 attachmentId={attachmentId}
                 disabled={disabled}
                 issueServiceType={issueServiceType}
+                onPreview={setPreviewAttachmentId}
               />
             ))}
           </div>
