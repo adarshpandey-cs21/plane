@@ -155,6 +155,9 @@ class InstanceEndpoint(BaseAPIView):
         # File size settings
         data["file_size_limit"] = float(os.environ.get("FILE_SIZE_LIMIT", 5242880))
 
+        # Work item fields required on creation
+        data["issue_required_fields"] = settings.ISSUE_REQUIRED_FIELDS
+
         # is smtp configured
         data["is_smtp_configured"] = bool(EMAIL_HOST)
 

@@ -61,6 +61,7 @@ export interface IInstanceConfig {
   has_llm_configured: boolean;
   file_size_limit: number | undefined;
   is_smtp_configured: boolean;
+  issue_required_fields?: string[];
   app_base_url: string | undefined;
   space_base_url: string | undefined;
   admin_base_url: string | undefined;

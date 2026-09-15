@@ -17,6 +17,7 @@ from .user import UserLiteSerializer
 from .state import StateLiteSerializer
 from .project import ProjectLiteSerializer
 from .workspace import WorkspaceLiteSerializer
+from plane.utils.issue_required_fields import validate_issue_required_fields
 from plane.db.models import (
     User,
     Issue,
@@ -137,6 +138,12 @@ class IssueCreateSerializer(BaseSerializer):
             and attrs.get("start_date", None) > attrs.get("target_date", None)
         ):
             raise serializers.ValidationError("Start date cannot exceed target date")
+
+        # Enforce the configured required fields only while creating a work item
+        if self.instance is None and not self.context.get("skip_required_fields", False):
+            required_fields_errors = validate_issue_required_fields(self.initial_data)
+            if required_fields_errors:
+                raise serializers.ValidationError(required_fields_errors)
 
         # Validate description content for security
         if "description_html" in attrs and attrs["description_html"]:

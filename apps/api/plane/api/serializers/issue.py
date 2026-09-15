@@ -31,6 +31,7 @@ from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
 )
+from plane.utils.issue_required_fields import validate_issue_required_fields
 
 from .base import BaseSerializer
 from .cycle import CycleLiteSerializer, CycleSerializer
@@ -79,6 +80,12 @@ class IssueSerializer(BaseSerializer):
             and data.get("start_date", None) > data.get("target_date", None)
         ):
             raise serializers.ValidationError("Start date cannot exceed target date")
+
+        # Enforce the configured required fields only while creating a work item
+        if self.instance is None and not self.context.get("skip_required_fields", False):
+            required_fields_errors = validate_issue_required_fields(self.initial_data)
+            if required_fields_errors:
+                raise serializers.ValidationError(required_fields_errors)
 
         try:
             if data.get("description_html", None) is not None:

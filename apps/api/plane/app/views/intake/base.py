@@ -257,6 +257,8 @@ class IntakeIssueViewSet(BaseViewSet):
                 "workspace_id": project.workspace_id,
                 "default_assignee_id": project.default_assignee_id,
                 "allow_triage_state": True,
+                # Intake requests are triaged later, so required fields are not enforced
+                "skip_required_fields": True,
             },
         )
         if serializer.is_valid():

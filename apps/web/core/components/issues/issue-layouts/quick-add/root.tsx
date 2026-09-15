@@ -13,9 +13,11 @@ import { useForm } from "react-hook-form";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { PlusIcon } from "@plane/propel/icons";
-import { setPromiseToast } from "@plane/propel/toast";
+import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
 import type { IProject, TIssue, EIssueLayoutTypes } from "@plane/types";
 import { cn, createIssuePayload } from "@plane/utils";
+// hooks
+import { useIssueRequiredFields } from "@/hooks/use-issue-required-fields";
 // plane web imports
 import { QuickAddIssueFormRoot } from "@/plane-web/components/issues/quick-add";
 // local imports
@@ -70,6 +72,8 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
   const { workspaceSlug, projectId } = useParams();
   // states
   const [isOpen, setIsOpen] = useState(isQuickAddOpen ?? false);
+  // hooks
+  const { getRequiredFieldsError } = useIssueRequiredFields();
   // form info
   const {
     reset,
@@ -89,23 +93,30 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
     if (!isOpen) reset({ ...defaultValues });
   }, [isOpen, reset]);
 
-  const handleIsOpen = (isOpen: boolean) => {
+  const handleIsOpen = (open: boolean) => {
     if (isQuickAddOpen !== undefined && setIsQuickAddOpen) {
-      setIsQuickAddOpen(isOpen);
+      setIsQuickAddOpen(open);
     } else {
-      setIsOpen(isOpen);
+      setIsOpen(open);
     }
   };
 
   const onSubmitHandler = async (formData: TIssue) => {
     if (isSubmitting || !workspaceSlug || !projectId) return;
 
-    reset({ ...defaultValues });
-
     const payload = createIssuePayload(projectId.toString(), {
-      ...(prePopulatedData ?? {}),
+      ...prePopulatedData,
       ...formData,
     });
+
+    // quick add only captures the title, so block creation if any configured required field is missing
+    const requiredFieldsError = getRequiredFieldsError(payload);
+    if (requiredFieldsError) {
+      setToast({ type: TOAST_TYPE.ERROR, title: t("common.error.label"), message: requiredFieldsError });
+      return;
+    }
+
+    reset({ ...defaultValues });
 
     if (quickAddCallback) {
       const quickAddPromise = quickAddCallback(projectId.toString(), { ...payload });
@@ -149,7 +160,7 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
           layout={layout}
           prePopulatedData={prePopulatedData}
           projectId={projectId?.toString()}
-          hasError={errors && errors?.name && errors?.name?.message ? true : false}
+          hasError={!!errors?.name?.message}
           setFocus={setFocus}
           register={register}
           onSubmit={handleSubmit(onSubmitHandler)}

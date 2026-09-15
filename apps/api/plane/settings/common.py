@@ -334,6 +334,12 @@ CELERY_IMPORTS = (
 
 FILE_SIZE_LIMIT = int(os.environ.get("FILE_SIZE_LIMIT", 5242880))
 
+# Comma separated list of work item fields required while creating a work item
+# e.g. ISSUE_REQUIRED_FIELDS=target_date,start_date
+ISSUE_REQUIRED_FIELDS = [
+    field.strip() for field in os.environ.get("ISSUE_REQUIRED_FIELDS", "").split(",") if field.strip()
+]
+
 # Unsplash Access key
 UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY")
 # Github Access Token

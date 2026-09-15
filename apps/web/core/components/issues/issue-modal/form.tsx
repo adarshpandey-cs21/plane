@@ -42,6 +42,7 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
 import { useWorkspaceDraftIssues } from "@/hooks/store/workspace-draft";
+import { useIssueRequiredFields } from "@/hooks/use-issue-required-fields";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { useProjectIssueProperties } from "@/hooks/use-project-issue-properties";
 // plane web imports
@@ -144,6 +145,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
   } = useIssueDetail();
   const { fetchCycles } = useProjectIssueProperties();
   const { getStateById } = useProjectState();
+  const { getRequiredFieldsError } = useIssueRequiredFields();
 
   // form info
   const methods = useForm<TIssue>({
@@ -173,6 +175,13 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
   const isDisabled = isSubmitting || isApplyingTemplate;
 
   const { getIndex } = getTabIndex(ETabIndices.ISSUE_FORM, isMobile);
+
+  // shows a toast and returns false if any configured required field is missing
+  const validateRequiredFields = (formData: Partial<TIssue>) => {
+    const error = getRequiredFieldsError(formData);
+    if (error) setToast({ type: TOAST_TYPE.ERROR, title: t("error"), message: error });
+    return !error;
+  };
 
   //reset few fields on projectId change
   useEffect(() => {
@@ -235,6 +244,9 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
       return;
     }
 
+    // required fields are enforced only while creating a work item (not for drafts or updates)
+    if (!data?.id && !isDraft && !is_draft_issue && !validateRequiredFields(formData)) return;
+
     // check for required properties validation
     if (
       !handlePropertyValuesValidation({
@@ -286,6 +298,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
 
   const handleMoveToProjects = async () => {
     if (!data?.id || !data?.project_id || !data) return;
+    if (!validateRequiredFields({ ...data, ...getValues() })) return;
     setIsMoving(true);
     try {
       await handleCreateUpdatePropertyValues({
