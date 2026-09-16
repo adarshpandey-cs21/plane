@@ -78,11 +78,7 @@ jobs:
       - id: set_env_variables
         name: Set Environment Variables
         run: |
-          if [ "${{ env.ARM64_BUILD }}" == "true" ] || ([ "${{ env.BUILD_TYPE }}" == "Release" ] && [ "${{ env.IS_PRERELEASE }}" != "true" ]); then
-            echo "BUILDX_PLATFORMS=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
-          else
-            echo "BUILDX_PLATFORMS=linux/amd64" >> $GITHUB_OUTPUT
-          fi
+          echo "BUILDX_PLATFORMS=linux/arm64" >> $GITHUB_OUTPUT
           BR_NAME=$( echo "${{ env.TARGET_BRANCH }}" |sed 's/[^a-zA-Z0-9.-]//g')
           echo "TARGET_BRANCH=$BR_NAME" >> $GITHUB_OUTPUT
 
@@ -138,7 +134,8 @@ jobs:
 
   branch_build_push_admin:
     name: Build-Push Admin Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs: [branch_build_setup]
     steps:
       - name: Checkout
@@ -166,7 +163,8 @@ jobs:
 
   branch_build_push_web:
     name: Build-Push Web Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs: [branch_build_setup]
     steps:
       - name: Checkout
@@ -194,7 +192,8 @@ jobs:
 
   branch_build_push_space:
     name: Build-Push Space Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs: [branch_build_setup]
     steps:
       - name: Checkout
@@ -222,7 +221,8 @@ jobs:
 
   branch_build_push_live:
     name: Build-Push Live Collaboration Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs: [branch_build_setup]
     steps:
       - name: Checkout
@@ -250,7 +250,8 @@ jobs:
 
   branch_build_push_api:
     name: Build-Push API Server Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs: [branch_build_setup]
     steps:
       - name: Checkout
@@ -278,7 +279,8 @@ jobs:
 
   branch_build_push_proxy:
     name: Build-Push Proxy Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs: [branch_build_setup]
     steps:
       - name: Checkout
@@ -307,7 +309,8 @@ jobs:
   branch_build_push_aio:
     if: ${{ needs.branch_build_setup.outputs.aio_build == 'true' }}
     name: Build-Push AIO Docker Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     needs:
       - branch_build_setup
       - branch_build_push_admin
